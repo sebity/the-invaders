@@ -28,7 +28,8 @@
 (defparameter *enemy-shots* nil)
 (defparameter *enemy-direction* 'right)
 
-(defparameter *enemy-move-delay* 10)
+(defparameter *enemy-move-delay* 20)
+(defparameter *enemy-move-space* 5)
 
 (defparameter *game-ticks* 0)
 
@@ -232,22 +233,44 @@
 (defun update-enemy-position ()
   (cond ((equalp *enemy-direction* 'right)
 	 (loop for e in *enemy*
-	    do (setf (enemy-x e) (+ (enemy-x e) 5))))
+	    do (setf (enemy-x e) (+ (enemy-x e) *enemy-move-space*))))
 
 	((equalp *enemy-direction* 'left)
 	 (loop for e in *enemy*
-	    do (setf (enemy-x e) (+ (enemy-x e) -5))))
+	    do (setf (enemy-x e) (+ (enemy-x e) (- *enemy-move-space*)))))
 
 	((equalp *enemy-direction* 'down-and-right)
 	 (loop for e in *enemy*
-	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
+	    do (progn (setf (enemy-y e) (+ (enemy-y e) 10))
 		      (setf *enemy-direction* 'right))))
 
 	((equalp *enemy-direction* 'down-and-left)
 	 (loop for e in *enemy*
-	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
+	    do (progn (setf (enemy-y e) (+ (enemy-y e) 10))
 		      (setf *enemy-direction* 'left))))))
 
+
+(defun determine-enemy-speed ()
+  (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 10))
+	((= (length *enemy*) 20) (setf *enemy-move-delay* 9))
+	((= (length *enemy*) 10) (setf *enemy-move-delay* 8))
+	((= (length *enemy*) 5) (setf *enemy-move-delay* 7))
+	((= (length *enemy*) 2) (setf *enemy-move-delay* 4))
+	((= (length *enemy*) 1) (setf *enemy-move-delay* 2))
+	(t ())))
+
+
+;;;; FIRE-ENEMY-SHOT function
+
+(defun fire-enemy-shot (x y)
+  (push (make-enemy-shot :x x :y y :dy 5) *enemy-shots*))
+
+
+;;;; DRAW-ENEMY-SHOT function
+
+(defun draw-enemy-shot ()
+  (loop for f in *enemy-shots*
+     do (draw-box (enemy-shot-x f) (enemy-shot-y f) 2 10 255 0 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -303,11 +326,10 @@
 		 (<= (enemy-y e) (player-shot-y s))
 		 (>= (+ (enemy-y e) 32) (player-shot-y s)))
 	    (progn (setf *enemy* (remove e *enemy*))
-		   (setf *player-shots* (remove s *player-shots*))))))
+		   (setf *player-shots* (remove s *player-shots*))
+		   (determine-enemy-speed)))))
 
 
-(defun collision-shot-enemy (x y)
-  )
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; LEVEL ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -354,13 +376,6 @@
 
 
 
-(defun create-level (lvl)
-  (cond ((= lvl 1)
-	 (setf *level* (make-array (list 4 8) :initial-element 1)))))
-
-  
-
-
 ;;;; PAUSE-GAME function
 
 (defun pause-game ()
@@ -375,12 +390,14 @@
   
   (unless (eql *pause* t)
     (update-player-shots)
-    (update-enemy))
+    (update-enemy)
+    (update-player-shots))
 
   (display-level)
   (draw-player-ship *player*)
   (draw-enemy)
   (draw-shot)
+  (draw-enemy-shot)
   (draw-game-ui))
 
 
@@ -431,7 +448,9 @@
   (setf *player-shots* nil)
   (setf *pause* nil)
   (setf *enemy-direction* 'right)
-  (create-level *player-level*)
+  (setf *enemy-move-delay* 20)
+  (setf *enemy-move-space* 5)
+  (setf *enemy-move-multiplier* 1)
   (create-enemy))
 
 
