@@ -47,6 +47,8 @@
 (defparameter *gfx-ss-player* (merge-pathnames "spritesheet_player.png" *gfx-root*))
 (defparameter *gfx-ss-enemy* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
 (defparameter *gfx-space-bg* (merge-pathnames "space-bg.jpg" *gfx-root*))
+(defparameter *gfx-title-bg* (merge-pathnames "title-bg.jpg" *gfx-root*))
+(defparameter *gfx-game-over-bg* (merge-pathnames "game-over-bg.jpg" *gfx-root*))
 
 ;;;; Font Params
 (defparameter *terminus-ttf-12* 
@@ -447,9 +449,13 @@
 ;;;; DISPLAY-END-GAME function
 
 (defun display-end-game ()
-  (draw-text "The Invaders" 310 20 255 255 255 *ttf-font-huge*)
+  (sdl:draw-surface-at-* (sdl:load-image *gfx-game-over-bg*) 0 0)
 
-  (draw-text "Game Over" 20 100 255 255 255)
+  ;(draw-text "The Invaders" 310 20 255 255 255 *ttf-font-huge*)
+
+  (draw-text "Game Over" 330 150 255 255 255 *ttf-font-huge*)
+
+  (draw-text (format nil "Final Score: ~a" *player-score*) 280 250 255 255 0 *ttf-font-huge*)
 
   (draw-text "Press SPACE to Continue..." 290 570 255 255 255))
 
@@ -457,7 +463,7 @@
 ;;;; DISPLAY-MENU function
 
 (defun display-menu ()
-  (draw-text "The Invaders" 310 20 255 255 255 *ttf-font-huge*)
+  (sdl:draw-surface-at-* (sdl:load-image *gfx-title-bg*) 0 0)
 
   (draw-text "Press SPACE to Continue..." 290 570 255 255 255))
 
