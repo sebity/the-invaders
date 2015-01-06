@@ -1,5 +1,6 @@
 ;;;; package.lisp
 
 (defpackage #:the-invaders
-  (:use #:cl))
+  (:use #:cl)
+  (:export #:start))
 
