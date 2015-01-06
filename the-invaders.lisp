@@ -13,8 +13,8 @@
 (defparameter *game-state* 0) ; 0:menu/intro, 1:in game, 2:game over
 
 (defparameter *level* nil)
-(defparameter *space-w* 80)
-(defparameter *space-h* 50)
+(defparameter *space-w* 70)
+(defparameter *space-h* 45)
 
 (defparameter *pause* nil)
 
@@ -29,8 +29,8 @@
 (defparameter *enemy-shots* nil)
 (defparameter *enemy-direction* 'right)
 
-(defparameter *enemy-move-delay* 1)
-(defparameter *enemy-move-space* 1)
+(defparameter *enemy-move-delay* 60)
+(defparameter *enemy-move-space* 10)
 
 (defparameter *game-ticks* 0)
 
@@ -57,7 +57,7 @@
   (make-instance 'SDL:ttf-font-definition
 		 :size 18
 		 :filename (merge-pathnames "TerminusTTF.ttf" *font-root*)))
-(defparameter *termi111nus-ttf-24* 
+(defparameter *terminus-ttf-24* 
   (make-instance 'SDL:ttf-font-definition
 		 :size 24
 		 :filename (merge-pathnames "TerminusTTF.ttf" *font-root*)))
@@ -115,7 +115,7 @@
        (swank::handle-requests connection t)))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;; MATHS ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;; UTILS ;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;; SQUARE function
@@ -123,6 +123,11 @@
 (defun square (x)
   (* x x))
 
+
+;;;; RANDOM-ELEMENT function
+
+(defun random-element (lst)
+  (elt lst (random (length lst))))
 
 
 
@@ -252,26 +257,33 @@
 	((equalp *enemy-direction* 'down-and-left)
 	 (loop for e in *enemy*
 	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
-		      (setf *enemy-direction* 'left))))))
+		      (setf *enemy-direction* 'left)))))
+
+  (if (< (random 100) (+ 10 *player-level*))
+      (fire-enemy-shot)))
 
 
 ;;;; DETERMINE-ENEMY-SPEED function
 
 (defun determine-enemy-speed ()
-  (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 20))
-	((= (length *enemy*) 20) (setf *enemy-move-delay* 10))
-	((= (length *enemy*) 10) (setf *enemy-move-delay* 8))
-	((= (length *enemy*) 5) (setf *enemy-move-delay* 6))
-	((= (length *enemy*) 2) (setf *enemy-move-delay* 4))
-	((= (length *enemy*) 1) (setf *enemy-move-delay* 2))
+  (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 45))
+	((= (length *enemy*) 20) (setf *enemy-move-delay* 30))
+	((= (length *enemy*) 15) (setf *enemy-move-delay* 20))
+	((= (length *enemy*) 10) (setf *enemy-move-delay* 15))
+	((= (length *enemy*) 5) (setf *enemy-move-delay* 10))
+	((= (length *enemy*) 2) (setf *enemy-move-delay* 7))
+	((= (length *enemy*) 1) (setf *enemy-move-delay* 4))
 	(t ())))
 
 
 ;;;; FIRE-ENEMY-SHOT function
 
-(defun fire-enemy-shot (x y)
-  (push (make-enemy-shot :x x :y y :dy 5) *enemy-shots*)
-  (play-sound 2))
+(defun fire-enemy-shot ()
+  (let ((enemy (random-element *enemy*)))
+    (push (make-enemy-shot :x (+ (enemy-x enemy) 24) 
+			   :y (+ (enemy-y enemy) 32)
+			   :dy 5) *enemy-shots*)
+    (play-sound 2)))
 
 
 ;;;; DRAW-ENEMY-SHOT function
@@ -279,6 +291,33 @@
 (defun draw-enemy-shot ()
   (loop for f in *enemy-shots*
      do (draw-box (enemy-shot-x f) (enemy-shot-y f) 2 10 255 0 0)))
+
+
+;;;; UPDATE-ENEMY-SHOTS function
+
+(defun update-enemy-shots ()
+  (loop for f in *enemy-shots*
+     do (progn (if (> (enemy-shot-y f) *game-height*)
+		   (setf *enemy-shots* (remove f *enemy-shots*))
+		   (setf (enemy-shot-y f) (+ (enemy-shot-y f) (enemy-shot-dy f))))
+	       (enemy-shot-player f)))
+
+  (if (<= *player-lives* 0)
+      (change-game-state)))
+
+
+;;;; ENEMY-SHOT-PLAYER function
+
+(defun enemy-shot-player (s)
+  (let ((p *player*))
+    (if (and (<= (- (player-x p) 26) (enemy-shot-x s))
+		 (>= (+ (player-x p) 26) (+ (enemy-shot-x s) 2))
+		 (<= (player-y p) (enemy-shot-y s))
+		 (>= (+ (player-y p) 32) (enemy-shot-y s)))
+	    (progn (setf *player-lives* (decf *player-lives*))
+		   (play-sound 3)
+		   (setf (player-x p) 400)
+		   (setf *enemy-shots* (remove s *enemy-shots*))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -306,8 +345,9 @@
 ;;;; FIRE-SHOT function
 
 (defun fire-shot (p)
-  (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*)
-  (play-sound 2))
+  (if (zerop (length *player-shots*))
+      (progn (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*)
+	     (play-sound 2))))
 
 
 ;;;; DRAW-SHOT function
@@ -338,10 +378,12 @@
 	    (progn (setf *enemy* (remove e *enemy*))
 		   (play-sound 3)
 		   (setf *player-shots* (remove s *player-shots*))
+		   (setf *player-score* (+ *player-score* (* *player-level* 10)))
 		   (determine-enemy-speed))))
 
   (if (end-of-level-p)
-      (new-level)))
+      (progn (calculate-score)
+	     (new-level))))
 
 
 
@@ -358,9 +400,9 @@
 ;;;; DRAW-GAME-UI function
 
 (defun draw-game-ui ()
-  (draw-text "Score:" 20 5 255 255 255)
-  (draw-text "Level:" 380 5 255 255 255)
-  (draw-text "Lives:" 700 5 255 255 255)
+  (draw-text (format nil "Score: ~a" *player-score*) 20 5 255 255 255)
+  (draw-text (format nil "Level: ~a" *player-level*) 380 5 255 255 255)
+  (draw-text (format nil "Lives: ~a" *player-lives*) 700 5 255 255 255)
   (if (eql *pause* t)
       (draw-text "Paused" 
 	     380 280 255 255 255 *ttf-font-large*)))
@@ -374,18 +416,30 @@
       nil))
 
 
+(defun calculate-score ()
+  (setf *player-score* (+ *player-score* 
+			  (* *player-lives* 100)
+			  (* *player-level* 1000))))
+
+
 ;;;; NEW-LEVEL function
 
 (defun new-level ()
   (setf *player-level* (incf *player-level*))
-  (setf *enemy-move-delay* 30)
-  (create-enemy (+ 30 (* *player-level* 20))))
+  (reset-level))
 
 
 ;;;; RESET-LEVEL function
 
 (defun reset-level ()
-  )
+  (let ((level *player-level*))
+    (if (> level 15)
+	(setf level 15))
+    (create-enemy (+ 40 (* level 10)))
+    (setf *enemy-move-delay* 60)
+    (setf *enemy-direction* 'right)
+    (setf *player-shots* nil)
+    (setf *enemy-shots* nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SCREENS ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -426,7 +480,8 @@
   (unless (eql *pause* t)
     (update-player-shots)
     (update-enemy)
-    (update-player-shots))
+    (update-player-shots)
+    (update-enemy-shots))
 
   (display-level)
   (draw-player-ship *player*)
@@ -479,13 +534,12 @@
 ;;;; RESET-GAME function
 
 (defun reset-game ()
-  (setf *player-level* 0)
-  (setf *player-shots* nil)
-  (setf *player-score* 0)
   (setf *pause* nil)
-  (setf *enemy-direction* 'right)
-  (setf *enemy-move-delay* 30)
-  (setf *enemy-move-space* 10)
+  (setf *player-level* 0)
+  (setf *player-lives* 3)
+  (setf *player-score* 0)
+  (setf *player-shots* nil)
+  (setf *enemy-shots* nil)
   (new-level))
 
 
