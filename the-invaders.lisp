@@ -2,7 +2,7 @@
 
 (in-package #:the-invaders)
 
-(defparameter *data-root* "src/lisp/the-invaders/")
+(defparameter *data-root* (asdf:system-source-directory 'the-invaders))
 (defparameter *font-root* (merge-pathnames "fonts/" *data-root*))
 (defparameter *audio-root* (merge-pathnames "audio/" *data-root*))
 (defparameter *gfx-root* (merge-pathnames "gfx/" *data-root*))
@@ -22,14 +22,15 @@
 (defparameter *player-lives* 3)
 (defparameter *player-level* 1)
 (defparameter *player-shots* nil)
+(defparameter *player-score* 0)
 
 (defparameter *enemy* nil)
 (defparameter *enemy-count* 0)
 (defparameter *enemy-shots* nil)
 (defparameter *enemy-direction* 'right)
 
-(defparameter *enemy-move-delay* 20)
-(defparameter *enemy-move-space* 5)
+(defparameter *enemy-move-delay* 1)
+(defparameter *enemy-move-space* 1)
 
 (defparameter *game-ticks* 0)
 
@@ -38,11 +39,13 @@
 (defparameter *music* nil)
 (defparameter *soundfx* nil)
 
-(defparameter *sprite-sheet* nil)
+(defparameter *ss-player* nil)
+(defparameter *ss-enemy* nil)
 (defparameter *cells* nil)
 
 ;;;; GFX Params
-(defparameter *gfx-sprite-sheet* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
+(defparameter *gfx-ss-player* (merge-pathnames "spritesheet_player.png" *gfx-root*))
+(defparameter *gfx-ss-enemy* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
 (defparameter *gfx-space-bg* (merge-pathnames "space-bg.jpg" *gfx-root*))
 
 ;;;; Font Params
@@ -54,7 +57,7 @@
   (make-instance 'SDL:ttf-font-definition
 		 :size 18
 		 :filename (merge-pathnames "TerminusTTF.ttf" *font-root*)))
-(defparameter *terminus-ttf-24* 
+(defparameter *termi111nus-ttf-24* 
   (make-instance 'SDL:ttf-font-definition
 		 :size 24
 		 :filename (merge-pathnames "TerminusTTF.ttf" *font-root*)))
@@ -189,11 +192,11 @@
 
 ;;;; CREATE-ENEMY function
 
-(defun create-enemy ()
+(defun create-enemy (dy)
   (setf *enemy* 'nil)
   (loop for y below 5
      do (loop for x below 8
-	   do (push (make-enemy :x (* x *space-w*) :y (+ (* y *space-h*) 50)
+	   do (push (make-enemy :x (* x *space-w*) :y (+ (* y *space-h*) dy)
 				:sprite y) *enemy*))))
 
 
@@ -201,8 +204,9 @@
 
 (defun draw-enemy ()
   (loop for e in *enemy*
-     do (sdl:draw-surface-at-* *sprite-sheet* (enemy-x e) (enemy-y e) 
-			       :cell (+ (enemy-sprite e) (mod (enemy-x e) 10)))))
+     do (sdl:draw-surface-at-* *ss-enemy* (enemy-x e) (enemy-y e) 
+			       :cell (+ (enemy-sprite e) 
+					(mod (/ (enemy-x e) 2) 10)))))
 ;			       :cell (aref *level* (enemy-y e) (enemy-x e)))))
 
 
@@ -213,6 +217,7 @@
   (if (>= *game-ticks* *enemy-move-delay*)
       (progn (determine-enemy-position) 
 	     (update-enemy-position)
+	     (play-sound 1)
 	     (setf *game-ticks* 0))))
 
 
@@ -241,20 +246,22 @@
 
 	((equalp *enemy-direction* 'down-and-right)
 	 (loop for e in *enemy*
-	    do (progn (setf (enemy-y e) (+ (enemy-y e) 10))
+	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
 		      (setf *enemy-direction* 'right))))
 
 	((equalp *enemy-direction* 'down-and-left)
 	 (loop for e in *enemy*
-	    do (progn (setf (enemy-y e) (+ (enemy-y e) 10))
+	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
 		      (setf *enemy-direction* 'left))))))
 
 
+;;;; DETERMINE-ENEMY-SPEED function
+
 (defun determine-enemy-speed ()
-  (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 10))
-	((= (length *enemy*) 20) (setf *enemy-move-delay* 9))
+  (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 20))
+	((= (length *enemy*) 20) (setf *enemy-move-delay* 10))
 	((= (length *enemy*) 10) (setf *enemy-move-delay* 8))
-	((= (length *enemy*) 5) (setf *enemy-move-delay* 7))
+	((= (length *enemy*) 5) (setf *enemy-move-delay* 6))
 	((= (length *enemy*) 2) (setf *enemy-move-delay* 4))
 	((= (length *enemy*) 1) (setf *enemy-move-delay* 2))
 	(t ())))
@@ -263,7 +270,8 @@
 ;;;; FIRE-ENEMY-SHOT function
 
 (defun fire-enemy-shot (x y)
-  (push (make-enemy-shot :x x :y y :dy 5) *enemy-shots*))
+  (push (make-enemy-shot :x x :y y :dy 5) *enemy-shots*)
+  (play-sound 2))
 
 
 ;;;; DRAW-ENEMY-SHOT function
@@ -272,19 +280,20 @@
   (loop for f in *enemy-shots*
      do (draw-box (enemy-shot-x f) (enemy-shot-y f) 2 10 255 0 0)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;; CREATE-PLAYER function
 
 (defun create-player ()
-  (setf *player* (make-player :x 400 :y 580)))
+  (setf *player* (make-player :x 400 :y 540)))
 
 
 ;;;; DRAW-PLAYER-SHIP function
 
 (defun draw-player-ship (p)
-  (draw-box (player-x p) (player-y p) 50 10 255 255 255))
-
+  (sdl:draw-surface-at-* *ss-player* (- (player-x p) 26) (player-y p) 
+			       :cell (mod *game-ticks* 3)))
 
 ;;;; MOVE-PLAYER-SHIP function
 
@@ -297,7 +306,8 @@
 ;;;; FIRE-SHOT function
 
 (defun fire-shot (p)
-  (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*))
+  (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*)
+  (play-sound 2))
 
 
 ;;;; DRAW-SHOT function
@@ -326,8 +336,12 @@
 		 (<= (enemy-y e) (player-shot-y s))
 		 (>= (+ (enemy-y e) 32) (player-shot-y s)))
 	    (progn (setf *enemy* (remove e *enemy*))
+		   (play-sound 3)
 		   (setf *player-shots* (remove s *player-shots*))
-		   (determine-enemy-speed)))))
+		   (determine-enemy-speed))))
+
+  (if (end-of-level-p)
+      (new-level)))
 
 
 
@@ -340,6 +354,7 @@
 (defun display-level ()
   (sdl:draw-surface-at-* (sdl:load-image *gfx-space-bg*) 0 0))
 
+
 ;;;; DRAW-GAME-UI function
 
 (defun draw-game-ui ()
@@ -350,6 +365,27 @@
       (draw-text "Paused" 
 	     380 280 255 255 255 *ttf-font-large*)))
 
+
+;;;; END-OF-LEVEL-P function
+
+(defun end-of-level-p ()
+  (if (zerop (length *enemy*))
+      t
+      nil))
+
+
+;;;; NEW-LEVEL function
+
+(defun new-level ()
+  (setf *player-level* (incf *player-level*))
+  (setf *enemy-move-delay* 30)
+  (create-enemy (+ 30 (* *player-level* 20))))
+
+
+;;;; RESET-LEVEL function
+
+(defun reset-level ()
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SCREENS ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -373,7 +409,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; GAME STATE ;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 
 ;;;; PAUSE-GAME function
@@ -444,14 +479,14 @@
 ;;;; RESET-GAME function
 
 (defun reset-game ()
-  (setf *player-level* 1)
+  (setf *player-level* 0)
   (setf *player-shots* nil)
+  (setf *player-score* 0)
   (setf *pause* nil)
   (setf *enemy-direction* 'right)
-  (setf *enemy-move-delay* 20)
-  (setf *enemy-move-space* 5)
-  (setf *enemy-move-multiplier* 1)
-  (create-enemy))
+  (setf *enemy-move-delay* 30)
+  (setf *enemy-move-space* 10)
+  (new-level))
 
 
 
@@ -463,23 +498,33 @@
 
 
 (defun load-sprite-sheet ()
-  (setf *sprite-sheet* (sdl:load-image *gfx-sprite-sheet*))
+  ; enemy sprite sheet
+  (setf *ss-enemy* (sdl:load-image *gfx-ss-enemy*))
   
-  ;(setf *cells* '((0 0 88 64) (96 0 64 64) (168 0 56 64) (232 0 88 64) (328 0 88 64)))
   (setf *cells* '((0 0 48 32) (48 0 48 32) (96 0 48 32) (144 0 48 32) (192 0 48 32)
-		  (0 32 48 64) (48 32 48 64) (96 32 48 64) (144 32 48 64) (192 32 48 64)))
+		  (0 32 48 32) (48 32 48 32) (96 32 48 32) (144 32 48 32) (192 32 48 32)))
 
-  (setf (sdl:cells *sprite-sheet*) *cells*))
+  (setf (sdl:cells *ss-enemy*) *cells*)
+
+  ; player sprite sheet
+  (setf *ss-player* (sdl:load-image *gfx-ss-player*))
+  
+  (setf *cells* '((0 0 52 32) (0 32 52 32) (0 64 52 32)))
+
+  (setf (sdl:cells *ss-player*) *cells*))
 
 
 ;;;; SETUP-AUDIO function
 
 (defun setup-audio ()
-  (setf *soundfx* (make-array 3))
+  (setf *soundfx* (make-array 4))
   (sdl-mixer:init-mixer :mp3)
   (setf *mixer-opened* (sdl-mixer:OPEN-AUDIO :chunksize 1024 :enable-callbacks nil))
   (when *mixer-opened*
-    ;(setf (aref *soundfx* 0) (sdl-mixer:load-sample (sdl:create-path "beep.ogg" *audio-root*)))
+    (setf (aref *soundfx* 0) (sdl-mixer:load-sample (sdl:create-path "bass-1.ogg" *audio-root*)))
+    (setf (aref *soundfx* 1) (sdl-mixer:load-sample (sdl:create-path "bass-2.ogg" *audio-root*)))
+    (setf (aref *soundfx* 2) (sdl-mixer:load-sample (sdl:create-path "laser-1.ogg" *audio-root*)))
+    (setf (aref *soundfx* 3) (sdl-mixer:load-sample (sdl:create-path "explode-1.ogg" *audio-root*)))
     (sample-finished-action)
     (sdl-mixer:allocate-channels 16)))
 
