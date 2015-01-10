@@ -29,6 +29,8 @@
 (defparameter *enemy-shots* nil)
 (defparameter *enemy-direction* 'right)
 
+(defparameter *enemy-explosion* nil)
+
 (defparameter *enemy-move-delay* 60)
 (defparameter *enemy-move-space* 10)
 
@@ -46,6 +48,7 @@
 ;;;; GFX Params
 (defparameter *gfx-ss-player* (merge-pathnames "spritesheet_player.png" *gfx-root*))
 (defparameter *gfx-ss-enemy* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
+(defparameter *gfx-explosion* (merge-pathnames "explosion.png" *gfx-root*))
 (defparameter *gfx-space-bg* (merge-pathnames "space-bg.jpg" *gfx-root*))
 (defparameter *gfx-title-bg* (merge-pathnames "title-bg.jpg" *gfx-root*))
 (defparameter *gfx-game-over-bg* (merge-pathnames "game-over-bg.jpg" *gfx-root*))
@@ -94,6 +97,11 @@
   (x 0)
   (y 0)
   (dy 0))
+
+(defstruct enemy-explosion
+  (x 0)
+  (y 0)
+  (time 0))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SLIME ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -322,6 +330,23 @@
 		   (setf *enemy-shots* (remove s *enemy-shots*))))))
 
 
+;;;; CREATE-ENEMY-EXPLOSION function
+
+(defun create-enemy-explosion (x y)
+  (push (make-enemy-explosion :x x :y y :time 6) *enemy-explosion*))
+
+
+;;;; DRAW-ENEMY-EXPLOSION function
+
+(defun draw-enemy-explosion ()
+  (loop for e in *enemy-explosion*
+     do (progn (setf (enemy-explosion-time e) (decf (enemy-explosion-time e)))
+	       (if (zerop (enemy-explosion-time e))
+		   (setf *enemy-explosion* (remove e *enemy-explosion*))
+		   (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion*)
+					  (enemy-explosion-x e) (enemy-explosion-y e))))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;; CREATE-PLAYER function
@@ -377,7 +402,8 @@
 		 (>= (+ (enemy-x e) 48) (+ (player-shot-x s) 2))
 		 (<= (enemy-y e) (player-shot-y s))
 		 (>= (+ (enemy-y e) 32) (player-shot-y s)))
-	    (progn (setf *enemy* (remove e *enemy*))
+	    (progn (create-enemy-explosion (enemy-x e) (enemy-y e))
+		   (setf *enemy* (remove e *enemy*))
 		   (play-sound 3)
 		   (setf *player-shots* (remove s *player-shots*))
 		   (setf *player-score* (+ *player-score* (* *player-level* 10)))
@@ -441,7 +467,8 @@
     (setf *enemy-move-delay* 60)
     (setf *enemy-direction* 'right)
     (setf *player-shots* nil)
-    (setf *enemy-shots* nil)))
+    (setf *enemy-shots* nil)
+    (setf *enemy-explosion* nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SCREENS ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -494,6 +521,7 @@
   (draw-enemy)
   (draw-shot)
   (draw-enemy-shot)
+  (draw-enemy-explosion)
   (draw-game-ui))
 
 
@@ -546,6 +574,7 @@
   (setf *player-score* 0)
   (setf *player-shots* nil)
   (setf *enemy-shots* nil)
+  (setf *enemy-explosion* nil)
   (new-level))
 
 
