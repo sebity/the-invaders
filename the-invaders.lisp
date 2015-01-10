@@ -297,8 +297,8 @@
 	((= (length *enemy*) 15) (setf *enemy-move-delay* 20))
 	((= (length *enemy*) 10) (setf *enemy-move-delay* 15))
 	((= (length *enemy*) 5) (setf *enemy-move-delay* 12))
-	((= (length *enemy*) 2) (setf *enemy-move-delay* 10))
-	((= (length *enemy*) 1) (setf *enemy-move-delay* 8))
+	((= (length *enemy*) 2) (setf *enemy-move-delay* 9))
+	((= (length *enemy*) 1) (setf *enemy-move-delay* 5))
 	(t ())))
 
 
@@ -432,14 +432,15 @@
 
   (if (end-of-level-p)
       (progn (calculate-score)
-	     (new-level))))
+	     (new-level)
+	     (play-sound 5))))
 
 ;;;; CREATE-PLAYER-EXPLOSION function
 
 (defun create-player-explosion ()
   (push (make-player-explosion :x (player-x *player*)
 			       :y (player-y *player*)
-			       :time 10)
+			       :time 20)
 	*player-explosion*))
 
 
@@ -646,7 +647,7 @@
 ;;;; SETUP-AUDIO function
 
 (defun setup-audio ()
-  (setf *soundfx* (make-array 5))
+  (setf *soundfx* (make-array 6))
   (sdl-mixer:init-mixer :mp3)
   (setf *mixer-opened* (sdl-mixer:OPEN-AUDIO :chunksize 1024 :enable-callbacks nil))
   (when *mixer-opened*
@@ -655,6 +656,7 @@
     (setf (aref *soundfx* 2) (sdl-mixer:load-sample (sdl:create-path "laser-1.ogg" *audio-root*)))
     (setf (aref *soundfx* 3) (sdl-mixer:load-sample (sdl:create-path "explode-1.ogg" *audio-root*)))
     (setf (aref *soundfx* 4) (sdl-mixer:load-sample (sdl:create-path "explode-2.ogg" *audio-root*)))
+    (setf (aref *soundfx* 5) (sdl-mixer:load-sample (sdl:create-path "level-up.ogg" *audio-root*)))
     (sample-finished-action)
     (sdl-mixer:allocate-channels 16)))
 
