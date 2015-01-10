@@ -221,7 +221,7 @@
 (defun create-enemy (dy)
   (setf *enemy* 'nil)
 
-  (if (> dy 300)
+  (if (> dy 200)
       (setf dy 200))
 
   (loop for y below 5
@@ -284,9 +284,19 @@
 	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
 		      (setf *enemy-direction* 'left)))))
 
+  (enemy-hit-bottom)
+
   (dotimes (n (ceiling (/ *player-level* 5)))
     (if (< (random 100) (+ 20 *player-level*))
 	(fire-enemy-shot))))
+
+
+;;; ENEMY-HIT-BOTTOM function
+
+(defun enemy-hit-bottom ()
+  (loop for e in *enemy*
+     do (if (> (+ (enemy-y e) 32) 540)
+	    (setf *player-lives* 0))))
 
 
 ;;;; DETERMINE-ENEMY-SPEED function
@@ -297,7 +307,7 @@
 	((= (length *enemy*) 15) (setf *enemy-move-delay* 20))
 	((= (length *enemy*) 10) (setf *enemy-move-delay* 15))
 	((= (length *enemy*) 5) (setf *enemy-move-delay* 12))
-	((= (length *enemy*) 2) (setf *enemy-move-delay* 9))
+	((= (length *enemy*) 3) (setf *enemy-move-delay* 9))
 	((= (length *enemy*) 1) (setf *enemy-move-delay* 5))
 	(t ())))
 
