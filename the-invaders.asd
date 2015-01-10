@@ -1,9 +1,10 @@
 ;;;; the-invaders.asd
 
 (asdf:defsystem #:the-invaders
-  :description "Describe the-invaders here"
-  :author "Your Name <your.name@example.com>"
-  :license "Specify license here"
+  :version "1.0"
+  :description "A remake of the classic game Space Invaders"
+  :author "Jan Tatham <jan@sebity.com>"
+  :license "GPL v2"
   :depends-on (#:lispbuilder-sdl
                #:lispbuilder-sdl-ttf
                #:lispbuilder-sdl-mixer)
