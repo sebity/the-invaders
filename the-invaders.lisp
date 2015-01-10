@@ -23,12 +23,12 @@
 (defparameter *player-level* 1)
 (defparameter *player-shots* nil)
 (defparameter *player-score* 0)
+(defparameter *player-explosion* nil)
 
 (defparameter *enemy* nil)
 (defparameter *enemy-count* 0)
 (defparameter *enemy-shots* nil)
 (defparameter *enemy-direction* 'right)
-
 (defparameter *enemy-explosion* nil)
 
 (defparameter *enemy-move-delay* 60)
@@ -48,7 +48,8 @@
 ;;;; GFX Params
 (defparameter *gfx-ss-player* (merge-pathnames "spritesheet_player.png" *gfx-root*))
 (defparameter *gfx-ss-enemy* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
-(defparameter *gfx-explosion* (merge-pathnames "explosion.png" *gfx-root*))
+(defparameter *gfx-explosion-enemy* (merge-pathnames "explosion-1.png" *gfx-root*))
+(defparameter *gfx-explosion-player* (merge-pathnames "explosion-2.png" *gfx-root*))
 (defparameter *gfx-space-bg* (merge-pathnames "space-bg.jpg" *gfx-root*))
 (defparameter *gfx-title-bg* (merge-pathnames "title-bg.jpg" *gfx-root*))
 (defparameter *gfx-game-over-bg* (merge-pathnames "game-over-bg.jpg" *gfx-root*))
@@ -92,6 +93,16 @@
   (x 0)
   (y 0)
   (dy 0))
+
+(defstruct player-explosion
+  (x 0)
+  (y 0)
+  (time 0))
+
+(defstruct enemy
+  (x 0)
+  (y 0)
+  (sprite 0))
 
 (defstruct enemy-shot
   (x 0)
@@ -209,6 +220,10 @@
 
 (defun create-enemy (dy)
   (setf *enemy* 'nil)
+
+  (if (> dy 300)
+      (setf dy 200))
+
   (loop for y below 5
      do (loop for x below 8
 	   do (push (make-enemy :x (* x *space-w*) :y (+ (* y *space-h*) dy)
@@ -269,8 +284,9 @@
 	    do (progn (setf (enemy-y e) (+ (enemy-y e) 20))
 		      (setf *enemy-direction* 'left)))))
 
-  (if (< (random 100) (+ 10 *player-level*))
-      (fire-enemy-shot)))
+  (dotimes (n (ceiling (/ *player-level* 5)))
+    (if (< (random 100) (+ 20 *player-level*))
+	(fire-enemy-shot))))
 
 
 ;;;; DETERMINE-ENEMY-SPEED function
@@ -280,9 +296,9 @@
 	((= (length *enemy*) 20) (setf *enemy-move-delay* 30))
 	((= (length *enemy*) 15) (setf *enemy-move-delay* 20))
 	((= (length *enemy*) 10) (setf *enemy-move-delay* 15))
-	((= (length *enemy*) 5) (setf *enemy-move-delay* 10))
-	((= (length *enemy*) 2) (setf *enemy-move-delay* 7))
-	((= (length *enemy*) 1) (setf *enemy-move-delay* 4))
+	((= (length *enemy*) 5) (setf *enemy-move-delay* 12))
+	((= (length *enemy*) 2) (setf *enemy-move-delay* 10))
+	((= (length *enemy*) 1) (setf *enemy-move-delay* 8))
 	(t ())))
 
 
@@ -292,7 +308,7 @@
   (let ((enemy (random-element *enemy*)))
     (push (make-enemy-shot :x (+ (enemy-x enemy) 24) 
 			   :y (+ (enemy-y enemy) 32)
-			   :dy 5) *enemy-shots*)
+			   :dy (+ (random 3) 3)) *enemy-shots*)
     (play-sound 2)))
 
 
@@ -324,8 +340,9 @@
 		 (>= (+ (player-x p) 26) (+ (enemy-shot-x s) 2))
 		 (<= (player-y p) (enemy-shot-y s))
 		 (>= (+ (player-y p) 32) (enemy-shot-y s)))
-	    (progn (setf *player-lives* (decf *player-lives*))
-		   (play-sound 3)
+	    (progn (create-player-explosion)
+		   (setf *player-lives* (decf *player-lives*))
+		   (play-sound 4)
 		   (setf (player-x p) 400)
 		   (setf *enemy-shots* (remove s *enemy-shots*))))))
 
@@ -343,7 +360,7 @@
      do (progn (setf (enemy-explosion-time e) (decf (enemy-explosion-time e)))
 	       (if (zerop (enemy-explosion-time e))
 		   (setf *enemy-explosion* (remove e *enemy-explosion*))
-		   (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion*)
+		   (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-enemy*)
 					  (enemy-explosion-x e) (enemy-explosion-y e))))))
 
 
@@ -364,9 +381,13 @@
 ;;;; MOVE-PLAYER-SHIP function
 
 (defun move-player-ship (p direction)
-  (cond ((equalp direction 'left) (setf (player-x p) (- (player-x p) 4)))
+  (cond ((equalp direction 'left) (progn (setf (player-x p) (- (player-x p) 4))
+					 (if (<= (player-x p) 26)
+					     (setf (player-x p) 26))))
 
-	((equalp direction 'right) (setf (player-x p) (+ (player-x p) 4)))))
+	((equalp direction 'right) (progn (setf (player-x p) (+ (player-x p) 4))
+					  (if (>= (player-x p) (- *game-width* 26))
+					      (setf (player-x p) (- *game-width* 26)))))))
 
 
 ;;;; FIRE-SHOT function
@@ -413,7 +434,24 @@
       (progn (calculate-score)
 	     (new-level))))
 
+;;;; CREATE-PLAYER-EXPLOSION function
 
+(defun create-player-explosion ()
+  (push (make-player-explosion :x (player-x *player*)
+			       :y (player-y *player*)
+			       :time 10)
+	*player-explosion*))
+
+
+;;;; DRAW-PLAYER-EXPLOSION function
+
+(defun draw-player-explosion ()
+  (loop for p in *player-explosion*
+     do	(progn (setf (player-explosion-time p) (decf (player-explosion-time p)))
+	       (if (zerop (player-explosion-time p))
+		   (setf *player-explosion* (remove p *player-explosion*))
+		   (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-player*)
+					  (player-explosion-x p) (player-explosion-y p)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; LEVEL ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -463,7 +501,7 @@
   (let ((level *player-level*))
     (if (> level 15)
 	(setf level 15))
-    (create-enemy (+ 40 (* level 10)))
+    (create-enemy (+ 70 (* level 10)))
     (setf *enemy-move-delay* 60)
     (setf *enemy-direction* 'right)
     (setf *player-shots* nil)
@@ -521,6 +559,7 @@
   (draw-enemy)
   (draw-shot)
   (draw-enemy-shot)
+  (draw-player-explosion)
   (draw-enemy-explosion)
   (draw-game-ui))
 
@@ -573,6 +612,7 @@
   (setf *player-lives* 3)
   (setf *player-score* 0)
   (setf *player-shots* nil)
+  (setf *player-explosion* nil)
   (setf *enemy-shots* nil)
   (setf *enemy-explosion* nil)
   (new-level))
@@ -606,7 +646,7 @@
 ;;;; SETUP-AUDIO function
 
 (defun setup-audio ()
-  (setf *soundfx* (make-array 4))
+  (setf *soundfx* (make-array 5))
   (sdl-mixer:init-mixer :mp3)
   (setf *mixer-opened* (sdl-mixer:OPEN-AUDIO :chunksize 1024 :enable-callbacks nil))
   (when *mixer-opened*
@@ -614,6 +654,7 @@
     (setf (aref *soundfx* 1) (sdl-mixer:load-sample (sdl:create-path "bass-2.ogg" *audio-root*)))
     (setf (aref *soundfx* 2) (sdl-mixer:load-sample (sdl:create-path "laser-1.ogg" *audio-root*)))
     (setf (aref *soundfx* 3) (sdl-mixer:load-sample (sdl:create-path "explode-1.ogg" *audio-root*)))
+    (setf (aref *soundfx* 4) (sdl-mixer:load-sample (sdl:create-path "explode-2.ogg" *audio-root*)))
     (sample-finished-action)
     (sdl-mixer:allocate-channels 16)))
 
