@@ -462,7 +462,7 @@
 	       (if (zerop (player-explosion-time p))
 		   (setf *player-explosion* (remove p *player-explosion*))
 		   (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-player*)
-					  (player-explosion-x p) (player-explosion-y p)))))))
+					  (player-explosion-x p) (player-explosion-y p))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;; LEVEL ;;;;;;;;;;;;;;;;;;;;;;;;
