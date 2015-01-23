@@ -34,20 +34,25 @@
 (defparameter *enemy-move-delay* 60)
 (defparameter *enemy-move-space* 10)
 
+(defparameter *mothership* nil)
+(defparameter *mothership-explosion* nil)
+
 (defparameter *game-ticks* 0)
 
 ;;;; Sound Params
 (defparameter *mixer-opened* nil)
-(defparameter *music* nil)
+(defparameter *mothership-engine* nil)
 (defparameter *soundfx* nil)
 
 (defparameter *ss-player* nil)
 (defparameter *ss-enemy* nil)
+(defparameter *ss-mothership* nil)
 (defparameter *cells* nil)
 
 ;;;; GFX Params
 (defparameter *gfx-ss-player* (merge-pathnames "spritesheet_player.png" *gfx-root*))
 (defparameter *gfx-ss-enemy* (merge-pathnames "spritesheet_enemy.png" *gfx-root*))
+(defparameter *gfx-ss-mothership* (merge-pathnames "spritesheet_mothership.png" *gfx-root*))
 (defparameter *gfx-explosion-enemy* (merge-pathnames "explosion-1.png" *gfx-root*))
 (defparameter *gfx-explosion-player* (merge-pathnames "explosion-2.png" *gfx-root*))
 (defparameter *gfx-space-bg* (merge-pathnames "space-bg.jpg" *gfx-root*))
@@ -114,6 +119,15 @@
   (y 0)
   (time 0))
 
+(defstruct mothership
+  (x 0)
+  (y 0)
+  (dx 0))
+
+(defstruct mothership-explosion
+  (x 0)
+  (y 0)
+  (time 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;; SLIME ;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -374,6 +388,88 @@
 					  (enemy-explosion-x e) (enemy-explosion-y e))))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;; MOTHERSHIP ;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;; DEPLOY-MOTHERSHIP function
+
+(defun deploy-mothership ()
+  (let ((chance (random 1000)))
+    (if (and (= chance 1)
+	     (not *mothership*)
+	     (> (length *enemy*) 5)
+	     (< (length *enemy*) 35))
+	(create-mothership))))
+
+
+;;;; CREATE-MOTHERSHIP function
+
+(defun create-mothership ()
+  (let ((entrance (random 2))
+	(x -70)
+	(dx 3))
+
+    (if (= entrance 1)
+	(progn (setf x (+ *game-width* 5))
+	       (setf dx -3)))
+
+    (setf *mothership* (make-mothership :x x :y 35 :dx dx)))
+  (play-mothership-engine))
+
+
+;;;; DRAW-MOTHERSHIP function
+
+(defun draw-mothership ()
+  (if *mothership*
+      (let ((m *mothership*))
+	(sdl:draw-surface-at-* *ss-mothership* (mothership-x m) (mothership-y m)
+			       :cell (floor (mod *game-ticks* 9) 3)))))
+
+
+;;;; UPDATE-MOTHERSHIP function
+
+(defun update-mothership ()
+  (if *mothership*
+      (progn (let ((m *mothership*))
+	       (setf (mothership-x m) (+ (mothership-x m) (mothership-dx m)))
+	       (if (or (<= (mothership-x m) -75)
+		       (>= (mothership-x m) (+ *game-width* 10)))
+		   (setf *mothership* nil))))))
+
+
+;;;; CREATE-MOTHERSHIP-EXPLOSION function
+
+(defun create-mothership-explosion (m)
+  (setf *mothership-explosion* (make-mothership-explosion :x (mothership-x m)
+							  :y (mothership-y m)
+							  :time 15)))
+
+
+;;;; DRAW-MOTHERSHIP-EXPLOSION function
+
+(defun draw-mothership-explosion ()
+  (if *mothership-explosion*
+      (progn (let ((m *mothership-explosion*))
+	       (if (zerop (mothership-explosion-time m))
+		   (setf *mothership-explosion* nil)
+		   (progn (setf (mothership-explosion-time m)
+				(decf (mothership-explosion-time m)))
+			  (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-player*)
+						 (mothership-explosion-x m)
+						 (mothership-explosion-y m))))))))
+
+;;;; PLAY-MOTHERSHIP-ENGINE function
+
+(defun play-mothership-engine ()
+  (sdl-mixer:play-music *mothership-engine*))
+
+
+;;;; STOP-MOTHERSHIP-ENGINE function
+
+(defun halt-mothership-engine ()
+  (sdl-mixer:halt-music 100))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;; PLAYER ;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;; CREATE-PLAYER function
@@ -422,7 +518,8 @@
      do (progn (if (<= (player-shot-y f) 0)
 		   (setf *player-shots* (remove f *player-shots*))
 		   (setf (player-shot-y f) (+ (player-shot-y f) (player-shot-dy f))))
-	       (player-shot-enemy f))))
+	       (player-shot-enemy f)
+	       (player-shot-mothership f))))
 
 
 ;;;; PLAYER-SHOT-HIT function
@@ -437,13 +534,30 @@
 		   (setf *enemy* (remove e *enemy*))
 		   (play-sound 3)
 		   (setf *player-shots* (remove s *player-shots*))
-		   (setf *player-score* (+ *player-score* (* *player-level* 10)))
+		   (setf *player-score* (+ *player-score* 10))
 		   (determine-enemy-speed))))
 
   (if (end-of-level-p)
       (progn (calculate-score)
 	     (new-level)
-	     (play-sound 5))))
+	     (play-sound 6))))
+
+
+;;;; PLAYER-SHOT-MOTHERSHIP function
+
+(defun player-shot-mothership (s)
+  (if *mothership*
+      (let ((m *mothership*))
+	(if (and (<= (mothership-x m) (player-shot-x s))
+		 (>= (+ (mothership-x m) 64) (+ (player-shot-x s) 2))
+		 (<= (mothership-y m) (player-shot-y s))
+		 (>= (+ (mothership-y m) 32) (player-shot-y s)))
+	    (progn (create-mothership-explosion m)
+		   (setf *player-score* (+ *player-score* (calculate-mothership-score m)))
+		   (setf *mothership* nil)
+		   (halt-mothership-engine)
+		   (play-sound 5))))))
+
 
 ;;;; CREATE-PLAYER-EXPLOSION function
 
@@ -493,10 +607,35 @@
       nil))
 
 
+;;;; CALCULATE-SCORE function
+
 (defun calculate-score ()
-  (setf *player-score* (+ *player-score* 
-			  (* *player-lives* 100)
-			  (* *player-level* 1000))))
+  (setf *player-score* (+ *player-score* (* *player-lives* 100) (* *player-level* 100))))
+
+
+;;;; CALCULATE-MOTHERSHIP-SCORE function
+
+(defun calculate-mothership-score (m)
+  (let ((mid (+ (mothership-x m) 32))
+	(sect (/ *game-width* 4)))
+    (cond ((<= mid sect)
+	   (if (< (mothership-dx m) 0)
+	       50
+	       300))
+
+	  ((<= mid (* sect 2))
+	   (if (< (mothership-dx m) 0)
+	       100
+	       150))
+
+	  ((<= mid (* sect 3))
+	   (if (< (mothership-dx m) 0)
+	       150
+	       100))
+
+	  (t (if (< (mothership-dx m) 0)
+		 300
+		 50)))))
 
 
 ;;;; NEW-LEVEL function
@@ -515,6 +654,7 @@
     (create-enemy (+ 70 (* level 10)))
     (setf *enemy-move-delay* 60)
     (setf *enemy-direction* 'right)
+    (setf *mothership* nil)
     (setf *player-shots* nil)
     (setf *enemy-shots* nil)
     (setf *enemy-explosion* nil)))
@@ -562,16 +702,20 @@
   (unless (eql *pause* t)
     (update-player-shots)
     (update-enemy)
+    (update-mothership)
     (update-player-shots)
-    (update-enemy-shots))
+    (update-enemy-shots)
+    (deploy-mothership))
 
   (display-level)
   (draw-player-ship *player*)
   (draw-enemy)
+  (draw-mothership)
   (draw-shot)
   (draw-enemy-shot)
   (draw-player-explosion)
   (draw-enemy-explosion)
+  (draw-mothership-explosion)
   (draw-game-ui))
 
 
@@ -588,6 +732,7 @@
 (defun change-game-state ()
   (cond ((zerop *game-state*) 
 	 (progn (reset-game)
+		(play-sound 6)
 		(setf *game-state* 1)))
 
 	((= *game-state* 1) (setf *game-state* 2))
@@ -626,6 +771,7 @@
   (setf *player-explosion* nil)
   (setf *enemy-shots* nil)
   (setf *enemy-explosion* nil)
+  (setf *mothership-explosion* nil)
   (new-level))
 
 
@@ -651,13 +797,21 @@
   
   (setf *cells* '((0 0 52 32) (0 32 52 32) (0 64 52 32)))
 
-  (setf (sdl:cells *ss-player*) *cells*))
+  (setf (sdl:cells *ss-player*) *cells*)
+
+  ; mothership sprite sheet
+  (setf *ss-mothership* (sdl:load-image *gfx-ss-mothership*))
+  
+  (setf *cells* '((0 0 64 32) (0 32 64 32) (0 64 64 32)))
+
+  (setf (sdl:cells *ss-mothership*) *cells*)
+)
 
 
 ;;;; SETUP-AUDIO function
 
 (defun setup-audio ()
-  (setf *soundfx* (make-array 6))
+  (setf *soundfx* (make-array 7))
   (sdl-mixer:init-mixer :mp3)
   (setf *mixer-opened* (sdl-mixer:OPEN-AUDIO :chunksize 1024 :enable-callbacks nil))
   (when *mixer-opened*
@@ -666,7 +820,9 @@
     (setf (aref *soundfx* 2) (sdl-mixer:load-sample (sdl:create-path "laser-1.ogg" *audio-root*)))
     (setf (aref *soundfx* 3) (sdl-mixer:load-sample (sdl:create-path "explode-1.ogg" *audio-root*)))
     (setf (aref *soundfx* 4) (sdl-mixer:load-sample (sdl:create-path "explode-2.ogg" *audio-root*)))
-    (setf (aref *soundfx* 5) (sdl-mixer:load-sample (sdl:create-path "level-up.ogg" *audio-root*)))
+    (setf (aref *soundfx* 5) (sdl-mixer:load-sample (sdl:create-path "explode-3.ogg" *audio-root*)))
+    (setf (aref *soundfx* 6) (sdl-mixer:load-sample (sdl:create-path "level-up.ogg" *audio-root*)))
+    (setf *mothership-engine* (sdl-mixer:load-music (sdl:create-path "mothership.ogg" *audio-root*)))
     (sample-finished-action)
     (sdl-mixer:allocate-channels 16)))
 
@@ -683,12 +839,12 @@
 ;;;; CLEAN-UP function
 
 (defun clean-up ()
-  (when *music*
+  (when *mothership-engine*
     (when (sdl-mixer:music-playing-p)
       (sdl-mixer:Pause-Music)
       (sdl-mixer:Halt-Music))
-    (sdl:Free *music*)
-    (setf *music* nil))
+    (sdl:Free *mothership-engine*)
+    (setf *mothership-engine* nil))
 
   (when (sdl-mixer:sample-playing-p nil)
     (sdl-mixer:pause-sample t)
