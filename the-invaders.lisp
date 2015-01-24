@@ -317,11 +317,11 @@
 
 (defun determine-enemy-speed ()
   (cond ((= (length *enemy*) 30) (setf *enemy-move-delay* 45))
-	((= (length *enemy*) 20) (setf *enemy-move-delay* 30))
-	((= (length *enemy*) 15) (setf *enemy-move-delay* 20))
-	((= (length *enemy*) 10) (setf *enemy-move-delay* 15))
-	((= (length *enemy*) 5) (setf *enemy-move-delay* 12))
-	((= (length *enemy*) 3) (setf *enemy-move-delay* 9))
+	((= (length *enemy*) 25) (setf *enemy-move-delay* 30))
+	((= (length *enemy*) 20) (setf *enemy-move-delay* 20))
+	((= (length *enemy*) 15) (setf *enemy-move-delay* 15))
+	((= (length *enemy*) 10) (setf *enemy-move-delay* 12))
+	((= (length *enemy*) 5) (setf *enemy-move-delay* 9))
 	((= (length *enemy*) 1) (setf *enemy-move-delay* 5))
 	(t ())))
 
@@ -397,8 +397,8 @@
   (let ((chance (random 1000)))
     (if (and (= chance 1)
 	     (not *mothership*)
-	     (> (length *enemy*) 5)
-	     (< (length *enemy*) 35))
+	     (> (length *enemy*) 4)
+	     (< (length *enemy*) 38))
 	(create-mothership))))
 
 
@@ -763,6 +763,7 @@
 ;;;; RESET-GAME function
 
 (defun reset-game ()
+  (setf *random-state* (make-random-state t))
   (setf *pause* nil)
   (setf *player-level* 0)
   (setf *player-lives* 3)
@@ -801,7 +802,7 @@
 
   ; mothership sprite sheet
   (setf *ss-mothership* (sdl:load-image *gfx-ss-mothership*))
-  
+
   (setf *cells* '((0 0 64 32) (0 32 64 32) (0 64 64 32)))
 
   (setf (sdl:cells *ss-mothership*) *cells*)
