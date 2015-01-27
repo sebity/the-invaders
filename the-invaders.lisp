@@ -258,11 +258,11 @@
 
 (defun update-enemy ()
   (setf *game-ticks* (incf *game-ticks*))
-  (if (>= *game-ticks* *enemy-move-delay*)
-      (progn (determine-enemy-position) 
-	     (update-enemy-position)
-	     (play-sound 1)
-	     (setf *game-ticks* 0))))
+  (when (>= *game-ticks* *enemy-move-delay*)
+      (determine-enemy-position) 
+      (update-enemy-position)
+      (play-sound 1)
+      (setf *game-ticks* 0)))
 
 
 ;;;; DETERMINE-ENEMY-POSITION function
@@ -360,15 +360,15 @@
 
 (defun enemy-shot-player (s)
   (let ((p *player*))
-    (if (and (<= (- (player-x p) 26) (enemy-shot-x s))
+    (when (and (<= (- (player-x p) 26) (enemy-shot-x s))
 		 (>= (+ (player-x p) 26) (+ (enemy-shot-x s) 2))
 		 (<= (player-y p) (enemy-shot-y s))
 		 (>= (+ (player-y p) 32) (enemy-shot-y s)))
-	    (progn (create-player-explosion)
-		   (setf *player-lives* (decf *player-lives*))
-		   (play-sound 4)
-		   (setf (player-x p) 400)
-		   (setf *enemy-shots* (remove s *enemy-shots*))))))
+	    (create-player-explosion)
+	    (setf *player-lives* (decf *player-lives*))
+	    (play-sound 4)
+	    (setf (player-x p) 400)
+	    (setf *enemy-shots* (remove s *enemy-shots*)))))
 
 
 ;;;; CREATE-ENEMY-EXPLOSION function
@@ -409,9 +409,9 @@
 	(x -70)
 	(dx 3))
 
-    (if (= entrance 1)
-	(progn (setf x (+ *game-width* 5))
-	       (setf dx -3)))
+    (when (= entrance 1)
+	(setf x (+ *game-width* 5))
+	(setf dx -3))
 
     (setf *mothership* (make-mothership :x x :y 35 :dx dx)))
   (play-mothership-engine))
@@ -429,12 +429,12 @@
 ;;;; UPDATE-MOTHERSHIP function
 
 (defun update-mothership ()
-  (if *mothership*
-      (progn (let ((m *mothership*))
-	       (setf (mothership-x m) (+ (mothership-x m) (mothership-dx m)))
-	       (if (or (<= (mothership-x m) -75)
-		       (>= (mothership-x m) (+ *game-width* 10)))
-		   (setf *mothership* nil))))))
+  (when *mothership*
+      (let ((m *mothership*))
+       (setf (mothership-x m) (+ (mothership-x m) (mothership-dx m)))
+       (if (or (<= (mothership-x m) -75)
+	       (>= (mothership-x m) (+ *game-width* 10)))
+	   (setf *mothership* nil)))))
 
 
 ;;;; CREATE-MOTHERSHIP-EXPLOSION function
@@ -448,15 +448,15 @@
 ;;;; DRAW-MOTHERSHIP-EXPLOSION function
 
 (defun draw-mothership-explosion ()
-  (if *mothership-explosion*
-      (progn (let ((m *mothership-explosion*))
-	       (if (zerop (mothership-explosion-time m))
-		   (setf *mothership-explosion* nil)
-		   (progn (setf (mothership-explosion-time m)
-				(decf (mothership-explosion-time m)))
-			  (sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-player*)
-						 (mothership-explosion-x m)
-						 (mothership-explosion-y m))))))))
+  (when *mothership-explosion*
+      (let ((m *mothership-explosion*))
+	 (if (zerop (mothership-explosion-time m))
+	     (setf *mothership-explosion* nil)
+	     (progn (setf (mothership-explosion-time m)
+		(decf (mothership-explosion-time m)))
+		(sdl:draw-surface-at-* (sdl:load-image *gfx-explosion-player*)
+			(mothership-explosion-x m)
+			(mothership-explosion-y m)))))))
 
 ;;;; PLAY-MOTHERSHIP-ENGINE function
 
@@ -499,9 +499,9 @@
 ;;;; FIRE-SHOT function
 
 (defun fire-shot (p)
-  (if (zerop (length *player-shots*))
-      (progn (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*)
-	     (play-sound 2))))
+  (when (zerop (length *player-shots*))
+      (push (make-player-shot :x (player-x p) :y (player-y p) :dy -5) *player-shots*)
+      (play-sound 2)))
 
 
 ;;;; DRAW-SHOT function
@@ -537,10 +537,10 @@
 		   (setf *player-score* (+ *player-score* 10))
 		   (determine-enemy-speed))))
 
-  (if (end-of-level-p)
-      (progn (calculate-score)
-	     (new-level)
-	     (play-sound 6))))
+  (when (end-of-level-p)
+      (calculate-score)
+      (new-level)
+      (play-sound 6)))
 
 
 ;;;; PLAYER-SHOT-MOTHERSHIP function
