@@ -1,7 +1,7 @@
 ;;;; the-invaders.asd
 
 (asdf:defsystem #:the-invaders
-  :version "1.1"
+  :version "1.1.1"
   :description "A remake of the classic game Space Invaders"
   :author "Jan Tatham <jan@sebity.com>"
   :license "GPL v2"
